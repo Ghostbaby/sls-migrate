@@ -153,7 +153,7 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 		fmt.Printf("DEBUG: Creating alert %s\n", alert.Name)
 		fmt.Printf("DEBUG: originalConfig is nil: %v\n", originalConfig == nil)
 		if originalConfig != nil {
-			fmt.Printf("DEBUG: originalConfig has data: Type=%v, Version=%v\n", 
+			fmt.Printf("DEBUG: originalConfig has data: Type=%v, Version=%v\n",
 				originalConfig.Type, originalConfig.Version)
 		}
 
@@ -229,23 +229,23 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 
 			// 步骤3: 创建 alert_configurations 记录
 			configToCreate := models.AlertConfiguration{
-				AlertID:                    alert.ID,
-				AutoAnnotation:             originalConfig.AutoAnnotation,
-				Dashboard:                  originalConfig.Dashboard,
-				MuteUntil:                  originalConfig.MuteUntil,
-				NoDataFire:                 originalConfig.NoDataFire,
-				NoDataSeverity:             originalConfig.NoDataSeverity,
-				Threshold:                  originalConfig.Threshold,
-				Type:                       originalConfig.Type,
-				Version:                    originalConfig.Version,
-				SendResolved:               originalConfig.SendResolved,
-				ConditionConfigID:          originalConfig.ConditionConfigID,
-				GroupConfigID:              originalConfig.GroupConfigID,
-				PolicyConfigID:             originalConfig.PolicyConfigID,
-				TemplateConfigID:           originalConfig.TemplateConfigID,
-				SinkAlerthubConfigID:       originalConfig.SinkAlerthubConfigID,
-				SinkCmsConfigID:            originalConfig.SinkCmsConfigID,
-				SinkEventStoreConfigID:     originalConfig.SinkEventStoreConfigID,
+				AlertID:                alert.ID,
+				AutoAnnotation:         originalConfig.AutoAnnotation,
+				Dashboard:              originalConfig.Dashboard,
+				MuteUntil:              originalConfig.MuteUntil,
+				NoDataFire:             originalConfig.NoDataFire,
+				NoDataSeverity:         originalConfig.NoDataSeverity,
+				Threshold:              originalConfig.Threshold,
+				Type:                   originalConfig.Type,
+				Version:                originalConfig.Version,
+				SendResolved:           originalConfig.SendResolved,
+				ConditionConfigID:      originalConfig.ConditionConfigID,
+				GroupConfigID:          originalConfig.GroupConfigID,
+				PolicyConfigID:         originalConfig.PolicyConfigID,
+				TemplateConfigID:       originalConfig.TemplateConfigID,
+				SinkAlerthubConfigID:   originalConfig.SinkAlerthubConfigID,
+				SinkCmsConfigID:        originalConfig.SinkCmsConfigID,
+				SinkEventStoreConfigID: originalConfig.SinkEventStoreConfigID,
 			}
 
 			if err := tx.Create(&configToCreate).Error; err != nil {
@@ -364,6 +364,144 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 	})
 }
 
+// deleteConfigurationAssociations 删除 Configuration 的所有关联数据
+func (s *alertStore) deleteConfigurationAssociations(tx *gorm.DB, alertID uint) error {
+	// 先获取 Configuration ID
+	var configID uint
+	if err := tx.Model(&models.AlertConfiguration{}).Where("alert_id = ?", alertID).Select("id").First(&configID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil // 没有 Configuration，直接返回
+		}
+		return fmt.Errorf("failed to get configuration ID: %w", err)
+	}
+
+	// 删除所有关联的子表数据
+	if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SeverityConfiguration{}).Error; err != nil {
+		return fmt.Errorf("failed to delete severity configurations: %w", err)
+	}
+
+	if err := tx.Where("alert_config_id = ?", configID).Delete(&models.JoinConfiguration{}).Error; err != nil {
+		return fmt.Errorf("failed to delete join configurations: %w", err)
+	}
+
+	// 删除 Configuration 本身
+	if err := tx.Where("id = ?", configID).Delete(&models.AlertConfiguration{}).Error; err != nil {
+		return fmt.Errorf("failed to delete alert configuration: %w", err)
+	}
+
+	return nil
+}
+
+// recreateConfiguration 重新创建 Configuration 及其关联数据
+func (s *alertStore) recreateConfiguration(tx *gorm.DB, alert *models.Alert) error {
+	if alert.Configuration == nil {
+		return nil
+	}
+
+	// 创建新的 Configuration
+	configToCreate := models.AlertConfiguration{
+		AlertID:        alert.ID,
+		AutoAnnotation: alert.Configuration.AutoAnnotation,
+		Dashboard:      alert.Configuration.Dashboard,
+		MuteUntil:      alert.Configuration.MuteUntil,
+		NoDataFire:     alert.Configuration.NoDataFire,
+		NoDataSeverity: alert.Configuration.NoDataSeverity,
+		Threshold:      alert.Configuration.Threshold,
+		Type:           alert.Configuration.Type,
+		Version:        alert.Configuration.Version,
+		SendResolved:   alert.Configuration.SendResolved,
+	}
+
+	// 创建独立的配置表记录
+	if alert.Configuration.ConditionConfig != nil {
+		if err := tx.Create(alert.Configuration.ConditionConfig).Error; err != nil {
+			return fmt.Errorf("failed to create condition configuration: %w", err)
+		}
+		configToCreate.ConditionConfigID = &alert.Configuration.ConditionConfig.ID
+	}
+
+	if alert.Configuration.GroupConfig != nil {
+		if err := tx.Create(alert.Configuration.GroupConfig).Error; err != nil {
+			return fmt.Errorf("failed to create group configuration: %w", err)
+		}
+		configToCreate.GroupConfigID = &alert.Configuration.GroupConfig.ID
+	}
+
+	if alert.Configuration.PolicyConfig != nil {
+		if err := tx.Create(alert.Configuration.PolicyConfig).Error; err != nil {
+			return fmt.Errorf("failed to create policy configuration: %w", err)
+		}
+		configToCreate.PolicyConfigID = &alert.Configuration.PolicyConfig.ID
+	}
+
+	if alert.Configuration.TemplateConfig != nil {
+		if err := tx.Create(alert.Configuration.TemplateConfig).Error; err != nil {
+			return fmt.Errorf("failed to create template configuration: %w", err)
+		}
+		configToCreate.TemplateConfigID = &alert.Configuration.TemplateConfig.ID
+	}
+
+	// 创建 Sink 配置
+	if alert.Configuration.SinkAlerthubConfig != nil {
+		if err := tx.Create(alert.Configuration.SinkAlerthubConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
+		}
+		configToCreate.SinkAlerthubConfigID = &alert.Configuration.SinkAlerthubConfig.ID
+	}
+
+	if alert.Configuration.SinkCmsConfig != nil {
+		if err := tx.Create(alert.Configuration.SinkCmsConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink cms configuration: %w", err)
+		}
+		configToCreate.SinkCmsConfigID = &alert.Configuration.SinkCmsConfig.ID
+	}
+
+	if alert.Configuration.SinkEventStoreConfig != nil {
+		if err := tx.Create(alert.Configuration.SinkEventStoreConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink event store configuration: %w", err)
+		}
+		configToCreate.SinkEventStoreConfigID = &alert.Configuration.SinkEventStoreConfig.ID
+	}
+
+	// 创建 Configuration 记录
+	if err := tx.Create(&configToCreate).Error; err != nil {
+		return fmt.Errorf("failed to create alert configuration: %w", err)
+	}
+
+	alert.ConfigurationID = &configToCreate.ID
+
+	// 创建依赖于 alert_configurations 的记录
+	if len(alert.Configuration.SeverityConfigs) > 0 {
+		for i := range alert.Configuration.SeverityConfigs {
+			// 如果有 EvalCondition，先创建它
+			if alert.Configuration.SeverityConfigs[i].EvalCondition != nil {
+				if err := tx.Create(alert.Configuration.SeverityConfigs[i].EvalCondition).Error; err != nil {
+					return fmt.Errorf("failed to create eval condition: %w", err)
+				}
+				alert.Configuration.SeverityConfigs[i].EvalConditionID = &alert.Configuration.SeverityConfigs[i].EvalCondition.ID
+			}
+
+			alert.Configuration.SeverityConfigs[i].AlertConfigID = configToCreate.ID
+			alert.Configuration.SeverityConfigs[i].ID = 0
+		}
+		if err := tx.Create(&alert.Configuration.SeverityConfigs).Error; err != nil {
+			return fmt.Errorf("failed to create severity configurations: %w", err)
+		}
+	}
+
+	if len(alert.Configuration.JoinConfigs) > 0 {
+		for i := range alert.Configuration.JoinConfigs {
+			alert.Configuration.JoinConfigs[i].AlertConfigID = configToCreate.ID
+			alert.Configuration.JoinConfigs[i].ID = 0
+		}
+		if err := tx.Create(&alert.Configuration.JoinConfigs).Error; err != nil {
+			return fmt.Errorf("failed to create join configurations: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // UpdateWithTransaction 在事务中更新 Alert 及其关联数据
 func (s *alertStore) UpdateWithTransaction(ctx context.Context, alert *models.Alert) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -372,24 +510,122 @@ func (s *alertStore) UpdateWithTransaction(ctx context.Context, alert *models.Al
 			return fmt.Errorf("alert ID is required for update")
 		}
 
-		// 设置所有关联记录的外键ID
-		if alert.Configuration != nil {
-			alert.Configuration.AlertID = alert.ID
-		}
-		if alert.Schedule != nil {
-			alert.Schedule.AlertID = alert.ID
-		}
-		for i := range alert.Tags {
-			alert.Tags[i].AlertID = alert.ID
-		}
-		for i := range alert.Queries {
-			alert.Queries[i].AlertID = alert.ID
+		// 步骤1: 更新主记录
+		updateData := map[string]interface{}{
+			"display_name":       alert.DisplayName,
+			"description":        alert.Description,
+			"status":             alert.Status,
+			"last_modified_time": alert.LastModifiedTime,
 		}
 
-		// 使用 Select 排除自动管理的时间戳字段，避免 0000-00-00 错误
-		if err := tx.Session(&gorm.Session{FullSaveAssociations: true}).
-			Omit("created_at", "updated_at").Save(alert).Error; err != nil {
-			return fmt.Errorf("failed to update alert with associations: %w", err)
+		if err := tx.Model(&models.Alert{}).Where("id = ?", alert.ID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update alert: %w", err)
+		}
+
+		// 步骤2: 处理 Configuration 更新
+		if alert.Configuration != nil {
+			// 先删除旧的关联数据（但不删除主配置记录）
+			if err := s.deleteConfigurationAssociations(tx, alert.ID); err != nil {
+				return fmt.Errorf("failed to delete old configuration associations: %w", err)
+			}
+
+			// 更新现有的 Configuration 记录
+			if err := s.updateConfiguration(tx, alert); err != nil {
+				return fmt.Errorf("failed to update configuration: %w", err)
+			}
+		}
+
+		// 步骤3: 处理 Schedule 更新
+		if alert.Schedule != nil {
+			// 删除旧的 Schedule
+			if err := tx.Where("alert_id = ?", alert.ID).Delete(&models.AlertSchedule{}).Error; err != nil {
+				return fmt.Errorf("failed to delete old schedule: %w", err)
+			}
+
+			// 创建新的 Schedule
+			scheduleToCreate := models.AlertSchedule{
+				AlertID:        alert.ID,
+				CronExpression: alert.Schedule.CronExpression,
+				Delay:          alert.Schedule.Delay,
+				Interval:       alert.Schedule.Interval,
+				RunImmediately: alert.Schedule.RunImmediately,
+				TimeZone:       alert.Schedule.TimeZone,
+				Type:           alert.Schedule.Type,
+			}
+
+			if err := tx.Create(&scheduleToCreate).Error; err != nil {
+				return fmt.Errorf("failed to create new schedule: %w", err)
+			}
+			alert.ScheduleID = &scheduleToCreate.ID
+		}
+
+		// 步骤4: 处理 Tags 更新
+		if len(alert.Tags) > 0 {
+			// 删除旧的 Tags
+			if err := tx.Where("alert_id = ?", alert.ID).Delete(&models.AlertTag{}).Error; err != nil {
+				return fmt.Errorf("failed to delete old tags: %w", err)
+			}
+
+			// 创建新的 Tags
+			tagsToCreate := make([]models.AlertTag, len(alert.Tags))
+			for i, tag := range alert.Tags {
+				tagsToCreate[i] = models.AlertTag{
+					AlertID:  alert.ID,
+					TagType:  tag.TagType,
+					TagKey:   tag.TagKey,
+					TagValue: tag.TagValue,
+				}
+			}
+			if err := tx.Create(&tagsToCreate).Error; err != nil {
+				return fmt.Errorf("failed to create new tags: %w", err)
+			}
+		}
+
+		// 步骤5: 处理 Queries 更新
+		if len(alert.Queries) > 0 {
+			// 删除旧的 Queries
+			if err := tx.Where("alert_id = ?", alert.ID).Delete(&models.AlertQuery{}).Error; err != nil {
+				return fmt.Errorf("failed to delete old queries: %w", err)
+			}
+
+			// 创建新的 Queries
+			queriesToCreate := make([]models.AlertQuery, len(alert.Queries))
+			for i, query := range alert.Queries {
+				queriesToCreate[i] = models.AlertQuery{
+					AlertID:      alert.ID,
+					ChartTitle:   query.ChartTitle,
+					DashboardId:  query.DashboardId,
+					End:          query.End,
+					PowerSqlMode: query.PowerSqlMode,
+					Project:      query.Project,
+					Query:        query.Query,
+					Region:       query.Region,
+					RoleArn:      query.RoleArn,
+					Start:        query.Start,
+					Store:        query.Store,
+					StoreType:    query.StoreType,
+					TimeSpanType: query.TimeSpanType,
+					Ui:           query.Ui,
+				}
+			}
+			if err := tx.Create(&queriesToCreate).Error; err != nil {
+				return fmt.Errorf("failed to create new queries: %w", err)
+			}
+		}
+
+		// 步骤6: 更新主记录的关联ID
+		updateData = map[string]interface{}{}
+		if alert.ConfigurationID != nil {
+			updateData["configuration_id"] = *alert.ConfigurationID
+		}
+		if alert.ScheduleID != nil {
+			updateData["schedule_id"] = *alert.ScheduleID
+		}
+
+		if len(updateData) > 0 {
+			if err := tx.Model(&models.Alert{}).Where("id = ?", alert.ID).Updates(updateData).Error; err != nil {
+				return fmt.Errorf("failed to update alert with relation IDs: %w", err)
+			}
 		}
 
 		return nil
@@ -401,4 +637,372 @@ func (s *alertStore) Count(ctx context.Context) (int64, error) {
 	var total int64
 	err := s.db.WithContext(ctx).Model(&models.Alert{}).Count(&total).Error
 	return total, err
+}
+
+// updateConfiguration 更新现有的 Configuration 及其关联数据
+func (s *alertStore) updateConfiguration(tx *gorm.DB, alert *models.Alert) error {
+	if alert.Configuration == nil {
+		return nil
+	}
+
+	// 获取现有的 Configuration ID
+	var existingConfigID uint
+	if err := tx.Model(&models.AlertConfiguration{}).Where("alert_id = ?", alert.ID).Select("id").First(&existingConfigID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// 如果没有现有配置，则创建新的
+			return s.recreateConfiguration(tx, alert)
+		}
+		return fmt.Errorf("failed to get existing configuration ID: %w", err)
+	}
+
+	// 更新主配置记录
+	updateData := map[string]interface{}{
+		"auto_annotation":  alert.Configuration.AutoAnnotation,
+		"dashboard":        alert.Configuration.Dashboard,
+		"mute_until":       alert.Configuration.MuteUntil,
+		"no_data_fire":     alert.Configuration.NoDataFire,
+		"no_data_severity": alert.Configuration.NoDataSeverity,
+		"threshold":        alert.Configuration.Threshold,
+		"type":             alert.Configuration.Type,
+		"version":          alert.Configuration.Version,
+		"send_resolved":    alert.Configuration.SendResolved,
+	}
+
+	if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", existingConfigID).Updates(updateData).Error; err != nil {
+		return fmt.Errorf("failed to update alert configuration: %w", err)
+	}
+
+	// 更新关联的配置记录 - 使用 upsert 逻辑避免重复
+	if alert.Configuration.ConditionConfig != nil {
+		if err := s.upsertConditionConfig(tx, existingConfigID, alert.Configuration.ConditionConfig); err != nil {
+			return fmt.Errorf("failed to upsert condition configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.GroupConfig != nil {
+		if err := s.upsertGroupConfig(tx, existingConfigID, alert.Configuration.GroupConfig); err != nil {
+			return fmt.Errorf("failed to upsert group configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.PolicyConfig != nil {
+		if err := s.upsertPolicyConfig(tx, existingConfigID, alert.Configuration.PolicyConfig); err != nil {
+			return fmt.Errorf("failed to upsert policy configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.TemplateConfig != nil {
+		if err := s.upsertTemplateConfig(tx, existingConfigID, alert.Configuration.TemplateConfig); err != nil {
+			return fmt.Errorf("failed to upsert template configuration: %w", err)
+		}
+	}
+
+	// 更新 Sink 配置 - 使用 upsert 逻辑避免重复
+	if alert.Configuration.SinkAlerthubConfig != nil {
+		if err := s.upsertSinkAlerthubConfig(tx, existingConfigID, alert.Configuration.SinkAlerthubConfig); err != nil {
+			return fmt.Errorf("failed to upsert sink alerthub configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.SinkCmsConfig != nil {
+		if err := s.upsertSinkCmsConfig(tx, existingConfigID, alert.Configuration.SinkCmsConfig); err != nil {
+			return fmt.Errorf("failed to upsert sink cms configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.SinkEventStoreConfig != nil {
+		if err := s.upsertSinkEventStoreConfig(tx, existingConfigID, alert.Configuration.SinkEventStoreConfig); err != nil {
+			return fmt.Errorf("failed to upsert sink event store configuration: %w", err)
+		}
+	}
+
+	// 更新依赖于 alert_configurations 的记录
+	if len(alert.Configuration.SeverityConfigs) > 0 {
+		// 先删除旧的严重程度配置
+		if err := tx.Where("alert_config_id = ?", existingConfigID).Delete(&models.SeverityConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete old severity configurations: %w", err)
+		}
+
+		// 创建新的严重程度配置
+		for i := range alert.Configuration.SeverityConfigs {
+			// 如果有 EvalCondition，先创建它
+			if alert.Configuration.SeverityConfigs[i].EvalCondition != nil {
+				if err := tx.Create(alert.Configuration.SeverityConfigs[i].EvalCondition).Error; err != nil {
+					return fmt.Errorf("failed to create eval condition: %w", err)
+				}
+				alert.Configuration.SeverityConfigs[i].EvalConditionID = &alert.Configuration.SeverityConfigs[i].EvalCondition.ID
+			}
+
+			alert.Configuration.SeverityConfigs[i].AlertConfigID = existingConfigID
+			alert.Configuration.SeverityConfigs[i].ID = 0
+		}
+		if err := tx.Create(&alert.Configuration.SeverityConfigs).Error; err != nil {
+			return fmt.Errorf("failed to create severity configurations: %w", err)
+		}
+	}
+
+	if len(alert.Configuration.JoinConfigs) > 0 {
+		// 先删除旧的 Join 配置
+		if err := tx.Where("alert_config_id = ?", existingConfigID).Delete(&models.JoinConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete old join configurations: %w", err)
+		}
+
+		// 创建新的 Join 配置
+		for i := range alert.Configuration.JoinConfigs {
+			alert.Configuration.JoinConfigs[i].AlertConfigID = existingConfigID
+			alert.Configuration.JoinConfigs[i].ID = 0
+		}
+		if err := tx.Create(&alert.Configuration.JoinConfigs).Error; err != nil {
+			return fmt.Errorf("failed to create join configurations: %w", err)
+		}
+	}
+
+	// 设置主记录的配置ID
+	alert.ConfigurationID = &existingConfigID
+
+	return nil
+}
+
+// upsertConditionConfig 更新或插入条件配置
+func (s *alertStore) upsertConditionConfig(tx *gorm.DB, alertConfigID uint, config *models.ConditionConfiguration) error {
+	// 查找现有的条件配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("condition_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing condition config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create condition configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("condition_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update condition config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"condition":       config.Condition,
+			"count_condition": config.CountCondition,
+		}
+		if err := tx.Model(&models.ConditionConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update condition configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertGroupConfig 更新或插入分组配置
+func (s *alertStore) upsertGroupConfig(tx *gorm.DB, alertConfigID uint, config *models.GroupConfiguration) error {
+	// 查找现有的分组配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("group_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing group config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create group configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("group_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update group config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"fields": config.Fields,
+			"type":   config.Type,
+		}
+		if err := tx.Model(&models.GroupConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update group configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertPolicyConfig 更新或插入策略配置
+func (s *alertStore) upsertPolicyConfig(tx *gorm.DB, alertConfigID uint, config *models.PolicyConfiguration) error {
+	// 查找现有的策略配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("policy_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing policy config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create policy configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("policy_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update policy config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"alert_policy_id":  config.AlertPolicyId,
+			"action_policy_id": config.ActionPolicyId,
+			"repeat_interval":  config.RepeatInterval,
+		}
+		if err := tx.Model(&models.PolicyConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update policy configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertTemplateConfig 更新或插入模板配置
+func (s *alertStore) upsertTemplateConfig(tx *gorm.DB, alertConfigID uint, config *models.TemplateConfiguration) error {
+	// 查找现有的模板配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("template_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing template config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create template configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("template_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update template config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"template_id": config.TemplateId,
+			"lang":        config.Lang,
+			"type":        config.Type,
+			"version":     config.Version,
+			"aonotations": config.Aonotations,
+			"tokens":      config.Tokens,
+		}
+		if err := tx.Model(&models.TemplateConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update template configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertSinkAlerthubConfig 更新或插入 Sink Alerthub 配置
+func (s *alertStore) upsertSinkAlerthubConfig(tx *gorm.DB, alertConfigID uint, config *models.SinkAlerthubConfiguration) error {
+	// 查找现有的配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("sink_alerthub_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing sink alerthub config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("sink_alerthub_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update sink alerthub config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"enabled": config.Enabled,
+		}
+		if err := tx.Model(&models.SinkAlerthubConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update sink alerthub configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertSinkCmsConfig 更新或插入 Sink CMS 配置
+func (s *alertStore) upsertSinkCmsConfig(tx *gorm.DB, alertConfigID uint, config *models.SinkCmsConfiguration) error {
+	// 查找现有的配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("sink_cms_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing sink cms config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create sink cms configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("sink_cms_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update sink cms config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"enabled": config.Enabled,
+		}
+		if err := tx.Model(&models.SinkCmsConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update sink cms configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
+}
+
+// upsertSinkEventStoreConfig 更新或插入 Sink Event Store 配置
+func (s *alertStore) upsertSinkEventStoreConfig(tx *gorm.DB, alertConfigID uint, config *models.SinkEventStoreConfiguration) error {
+	// 查找现有的配置（通过主配置记录的外键引用）
+	var existingConfigID *uint
+	err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Select("sink_event_store_config_id").First(&existingConfigID).Error
+	if err != nil {
+		return fmt.Errorf("failed to get existing sink event store config ID: %w", err)
+	}
+
+	if existingConfigID == nil || *existingConfigID == 0 {
+		// 不存在则创建新的
+		config.ID = 0
+		if err := tx.Create(config).Error; err != nil {
+			return fmt.Errorf("failed to create sink event store configuration: %w", err)
+		}
+		// 更新主配置记录中的引用ID
+		if err := tx.Model(&models.AlertConfiguration{}).Where("id = ?", alertConfigID).Update("sink_event_store_config_id", config.ID).Error; err != nil {
+			return fmt.Errorf("failed to update sink event store config reference: %w", err)
+		}
+	} else {
+		// 存在则更新
+		updateData := map[string]interface{}{
+			"enabled":     config.Enabled,
+			"endpoint":    config.Endpoint,
+			"event_store": config.EventStore,
+			"project":     config.Project,
+			"role_arn":    config.RoleArn,
+		}
+		if err := tx.Model(&models.SinkEventStoreConfiguration{}).Where("id = ?", *existingConfigID).Updates(updateData).Error; err != nil {
+			return fmt.Errorf("failed to update sink event store configuration: %w", err)
+		}
+		config.ID = *existingConfigID
+	}
+
+	return nil
 }
