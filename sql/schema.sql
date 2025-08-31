@@ -218,3 +218,55 @@ CREATE INDEX idx_tags_composite ON alert_tags(alert_id, `tag_type`);
 ALTER TABLE alerts 
 ADD CONSTRAINT fk_alerts_configuration FOREIGN KEY (configuration_id) REFERENCES alert_configurations(id) ON DELETE SET NULL,
 ADD CONSTRAINT fk_alerts_schedule FOREIGN KEY (schedule_id) REFERENCES alert_schedules(id) ON DELETE SET NULL;
+
+
+
+
+
+DELIMITER $$
+
+-- 方案1：使用 AFTER DELETE 触发器（推荐）
+-- 在 alert_configurations 记录被删除后，删除相关的配置记录
+CREATE TRIGGER after_delete_alert_configurations
+AFTER DELETE ON alert_configurations
+FOR EACH ROW
+BEGIN
+    -- 此时 alert_configurations 记录已经被删除，外键约束不再存在
+    
+    -- 删除 condition_configurations
+    IF OLD.condition_config_id IS NOT NULL THEN
+        DELETE FROM condition_configurations WHERE id = OLD.condition_config_id;
+    END IF;
+    
+    -- 删除 group_configurations
+    IF OLD.group_config_id IS NOT NULL THEN
+        DELETE FROM group_configurations WHERE id = OLD.group_config_id;
+    END IF;
+    
+    -- 删除 policy_configurations
+    IF OLD.policy_config_id IS NOT NULL THEN
+        DELETE FROM policy_configurations WHERE id = OLD.policy_config_id;
+    END IF;
+    
+    -- 删除 template_configurations
+    IF OLD.template_config_id IS NOT NULL THEN
+        DELETE FROM template_configurations WHERE id = OLD.template_config_id;
+    END IF;
+    
+    -- 删除 sink_alerthub_configurations
+    IF OLD.sink_alerthub_config_id IS NOT NULL THEN
+        DELETE FROM sink_alerthub_configurations WHERE id = OLD.sink_alerthub_config_id;
+    END IF;
+    
+    -- 删除 sink_cms_configurations
+    IF OLD.sink_cms_config_id IS NOT NULL THEN
+        DELETE FROM sink_cms_configurations WHERE id = OLD.sink_cms_config_id;
+    END IF;
+    
+    -- 删除 sink_event_store_configurations
+    IF OLD.sink_event_store_config_id IS NOT NULL THEN
+        DELETE FROM sink_event_store_configurations WHERE id = OLD.sink_event_store_config_id;
+    END IF;
+END$$
+
+DELIMITER ;

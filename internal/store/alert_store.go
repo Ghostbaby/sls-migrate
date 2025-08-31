@@ -88,7 +88,39 @@ func (s *alertStore) Update(ctx context.Context, alert *models.Alert) error {
 
 // Delete 删除 Alert
 func (s *alertStore) Delete(ctx context.Context, id uint) error {
-	return s.db.WithContext(ctx).Delete(&models.Alert{}, id).Error
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 步骤1: 删除所有关联的子表数据
+		if err := s.deleteConfigurationAssociations(tx, id); err != nil {
+			return fmt.Errorf("failed to delete configuration associations: %w", err)
+		}
+
+		// 步骤2: 删除 Configuration 记录
+		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete alert configuration: %w", err)
+		}
+
+		// 步骤3: 删除 Schedule 记录
+		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertSchedule{}).Error; err != nil {
+			return fmt.Errorf("failed to delete alert schedule: %w", err)
+		}
+
+		// 步骤4: 删除 Tags 记录
+		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertTag{}).Error; err != nil {
+			return fmt.Errorf("failed to delete alert tags: %w", err)
+		}
+
+		// 步骤5: 删除 Queries 记录
+		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertQuery{}).Error; err != nil {
+			return fmt.Errorf("failed to delete alert queries: %w", err)
+		}
+
+		// 步骤6: 最后删除主记录
+		if err := tx.Delete(&models.Alert{}, id).Error; err != nil {
+			return fmt.Errorf("failed to delete alert: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // List 分页获取 Alert 列表
@@ -384,11 +416,7 @@ func (s *alertStore) deleteConfigurationAssociations(tx *gorm.DB, alertID uint) 
 		return fmt.Errorf("failed to delete join configurations: %w", err)
 	}
 
-	// 删除 Configuration 本身
-	if err := tx.Where("id = ?", configID).Delete(&models.AlertConfiguration{}).Error; err != nil {
-		return fmt.Errorf("failed to delete alert configuration: %w", err)
-	}
-
+	// 注意：这里不删除 Configuration 本身，因为主删除方法会处理
 	return nil
 }
 
