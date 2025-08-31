@@ -26,6 +26,10 @@ go.work.sum
 
 # env file
 .env
+test.env
+
+# bin directory
+bin/
 
 # Editor/IDE
 # .idea/

@@ -1,0 +1,246 @@
+{
+	"info": {
+		"_postman_id": "sls-migrate-api",
+		"name": "SLS Migrate API",
+		"description": "SLS Alert 迁移系统的 API 测试用例",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": ["{{base_url}}"],
+					"path": ["health"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create Alert",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"test-alert-001\",\n  \"display_name\": \"测试告警 001\",\n  \"description\": \"这是一个测试告警\",\n  \"status\": \"ENABLED\",\n  \"create_time\": 1703001600,\n  \"last_modified_time\": 1703001600,\n  \"configuration\": {\n    \"auto_annotation\": false,\n    \"dashboard\": \"test-dashboard\",\n    \"mute_until\": 0,\n    \"no_data_fire\": false,\n    \"no_data_severity\": 6,\n    \"threshold\": 100,\n    \"type\": \"default\",\n    \"version\": \"2.0\"\n  },\n  \"schedule\": {\n    \"cron_expression\": \"0/5 * * * *\",\n    \"delay\": 0,\n    \"interval\": \"60s\",\n    \"run_immediately\": false,\n    \"time_zone\": \"+0800\",\n    \"type\": \"FixedRate\"\n  },\n  \"tags\": [\n    {\n      \"tag_type\": \"label\",\n      \"tag_key\": \"environment\",\n      \"tag_value\": \"test\"\n    },\n    {\n      \"tag_type\": \"annotation\",\n      \"tag_key\": \"description\",\n      \"tag_value\": \"测试环境告警\"\n    }\n  ],\n  \"queries\": [\n    {\n      \"query_string\": \"* | SELECT COUNT(*) as cnt\",\n      \"query_type\": \"log\"\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Alert by ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts/1",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts", "1"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Alert by Name",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts/name/test-alert-001",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts", "name", "test-alert-001"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Alert",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"test-alert-001-updated\",\n  \"display_name\": \"测试告警 001 (已更新)\",\n  \"description\": \"这是一个已更新的测试告警\",\n  \"status\": \"ENABLED\",\n  \"configuration\": {\n    \"auto_annotation\": true,\n    \"dashboard\": \"test-dashboard-updated\",\n    \"threshold\": 200,\n    \"type\": \"default\",\n    \"version\": \"2.1\"\n  },\n  \"schedule\": {\n    \"cron_expression\": \"0/10 * * * *\",\n    \"interval\": \"120s\",\n    \"type\": \"FixedRate\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts/1",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts", "1"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Alerts",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts?page=1&page_size=10",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts"],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Alerts by Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts/status/ENABLED?page=1&page_size=10",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts", "status", "ENABLED"],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Alert",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/alerts/1",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "alerts", "1"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get SLS Alerts",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/alerts",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "alerts"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get SLS Alert by Name",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/alerts/name/test-alert-001",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "alerts", "name", "test-alert-001"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sync SLS Alerts",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/sync",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "sync"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get SLS Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/status",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "status"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sync Database to SLS",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"comment\": \"同步本地数据库中的 Alert 规则到阿里云 SLS\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/sync/db-to-sls",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "sync", "db-to-sls"]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Sync Status",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/v1/sls/sync/status",
+					"host": ["{{base_url}}"],
+					"path": ["api", "v1", "sls", "sync", "status"]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}
