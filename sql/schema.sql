@@ -38,13 +38,6 @@ CREATE TABLE IF NOT EXISTS alert_configurations (
     `type` VARCHAR(100) COMMENT '类型',
     version VARCHAR(50) COMMENT '版本',
     send_resolved BOOLEAN DEFAULT FALSE COMMENT '是否发送已解决的通知',
-    condition_config_id BIGINT UNSIGNED COMMENT '条件配置ID',
-    group_config_id BIGINT UNSIGNED COMMENT '分组配置ID',
-    policy_config_id BIGINT UNSIGNED COMMENT '策略配置ID',
-    template_config_id BIGINT UNSIGNED COMMENT '模板配置ID',
-    sink_alerthub_config_id BIGINT UNSIGNED COMMENT 'Sink Alerthub配置ID',
-    sink_cms_config_id BIGINT UNSIGNED COMMENT 'Sink CMS配置ID',
-    sink_event_store_config_id BIGINT UNSIGNED COMMENT 'Sink Event Store配置ID',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
     FOREIGN KEY (alert_id) REFERENCES alerts(id) ON DELETE CASCADE,
@@ -113,34 +106,45 @@ CREATE TABLE IF NOT EXISTS alert_queries (
 -- 6. 条件配置表: condition_configurations
 CREATE TABLE IF NOT EXISTS condition_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     `condition` TEXT COMMENT '条件表达式',
     count_condition TEXT COMMENT '计数条件表达式',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='条件配置表';
 
 -- 7. 分组配置表: group_configurations
 CREATE TABLE IF NOT EXISTS group_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     fields TEXT COMMENT '分组字段，逗号分隔',
     `type` VARCHAR(100) COMMENT '分组类型',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id),
+    INDEX idx_type (`type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分组配置表';
 
 -- 8. 策略配置表: policy_configurations
 CREATE TABLE IF NOT EXISTS policy_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     alert_policy_id VARCHAR(255) COMMENT 'Alert策略ID',
     action_policy_id VARCHAR(255) COMMENT 'Action策略ID',
     repeat_interval VARCHAR(100) COMMENT '重复间隔',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='策略配置表';
 
 -- 9. 模板配置表: template_configurations
 CREATE TABLE IF NOT EXISTS template_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     template_id VARCHAR(255) COMMENT '模板ID',
     lang VARCHAR(50) COMMENT '语言',
     `type` VARCHAR(100) COMMENT '模板类型',
@@ -148,7 +152,10 @@ CREATE TABLE IF NOT EXISTS template_configurations (
     aonotations TEXT COMMENT '注解，JSON格式',
     tokens TEXT COMMENT '令牌，JSON格式',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id),
+    INDEX idx_template_id (template_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='模板配置表';
 
 -- 10. 严重程度配置表: severity_configurations
@@ -167,25 +174,34 @@ CREATE TABLE IF NOT EXISTS severity_configurations (
 -- 11. Sink Alerthub配置表
 CREATE TABLE IF NOT EXISTS sink_alerthub_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     enabled BOOLEAN DEFAULT FALSE COMMENT '是否启用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Sink Alerthub配置表';
 
 -- 12. Sink CMS配置表
 CREATE TABLE IF NOT EXISTS sink_cms_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     enabled BOOLEAN DEFAULT FALSE COMMENT '是否启用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Sink CMS配置表';
 
 -- 13. Sink Event Store配置表
 CREATE TABLE IF NOT EXISTS sink_event_store_configurations (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+    alert_config_id BIGINT UNSIGNED NOT NULL COMMENT '关联的Alert配置ID',
     enabled BOOLEAN DEFAULT FALSE COMMENT '是否启用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间'
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+    FOREIGN KEY (alert_config_id) REFERENCES alert_configurations(id) ON DELETE CASCADE,
+    INDEX idx_alert_config_id (alert_config_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Sink Event Store配置表';
 
 -- 14. Join配置表
@@ -201,12 +217,8 @@ CREATE TABLE IF NOT EXISTS join_configurations (
     INDEX idx_join_type (join_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Join配置表';
 
--- 添加外键约束
-ALTER TABLE alert_configurations 
-ADD CONSTRAINT fk_condition_config FOREIGN KEY (condition_config_id) REFERENCES condition_configurations(id) ON DELETE SET NULL,
-ADD CONSTRAINT fk_group_config FOREIGN KEY (group_config_id) REFERENCES group_configurations(id) ON DELETE SET NULL,
-ADD CONSTRAINT fk_policy_config FOREIGN KEY (policy_config_id) REFERENCES policy_configurations(id) ON DELETE SET NULL,
-ADD CONSTRAINT fk_template_config FOREIGN KEY (template_config_id) REFERENCES template_configurations(id) ON DELETE SET NULL;
+-- 注意：现在这些配置表都有自己的 alert_config_id 字段，不再需要 alert_configurations 表中的反向引用
+-- 原来的外键约束已被移除，改为在配置表中直接引用 alert_configurations.id
 
 -- 创建索引优化查询性能
 CREATE INDEX idx_alerts_composite ON alerts(status, create_time);
@@ -223,50 +235,6 @@ ADD CONSTRAINT fk_alerts_schedule FOREIGN KEY (schedule_id) REFERENCES alert_sch
 
 
 
-DELIMITER $$
-
--- 方案1：使用 AFTER DELETE 触发器（推荐）
--- 在 alert_configurations 记录被删除后，删除相关的配置记录
-CREATE TRIGGER after_delete_alert_configurations
-AFTER DELETE ON alert_configurations
-FOR EACH ROW
-BEGIN
-    -- 此时 alert_configurations 记录已经被删除，外键约束不再存在
-    
-    -- 删除 condition_configurations
-    IF OLD.condition_config_id IS NOT NULL THEN
-        DELETE FROM condition_configurations WHERE id = OLD.condition_config_id;
-    END IF;
-    
-    -- 删除 group_configurations
-    IF OLD.group_config_id IS NOT NULL THEN
-        DELETE FROM group_configurations WHERE id = OLD.group_config_id;
-    END IF;
-    
-    -- 删除 policy_configurations
-    IF OLD.policy_config_id IS NOT NULL THEN
-        DELETE FROM policy_configurations WHERE id = OLD.policy_config_id;
-    END IF;
-    
-    -- 删除 template_configurations
-    IF OLD.template_config_id IS NOT NULL THEN
-        DELETE FROM template_configurations WHERE id = OLD.template_config_id;
-    END IF;
-    
-    -- 删除 sink_alerthub_configurations
-    IF OLD.sink_alerthub_config_id IS NOT NULL THEN
-        DELETE FROM sink_alerthub_configurations WHERE id = OLD.sink_alerthub_config_id;
-    END IF;
-    
-    -- 删除 sink_cms_configurations
-    IF OLD.sink_cms_config_id IS NOT NULL THEN
-        DELETE FROM sink_cms_configurations WHERE id = OLD.sink_cms_config_id;
-    END IF;
-    
-    -- 删除 sink_event_store_configurations
-    IF OLD.sink_event_store_config_id IS NOT NULL THEN
-        DELETE FROM sink_event_store_configurations WHERE id = OLD.sink_event_store_config_id;
-    END IF;
-END$$
-
-DELIMITER ;
+-- 注意：现在不再需要触发器，因为所有配置表都有 alert_config_id 外键约束
+-- 当 alert_configurations 记录被删除时，相关的配置记录会自动级联删除
+-- 触发器已被移除，简化了数据库设计

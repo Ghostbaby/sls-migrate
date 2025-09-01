@@ -32,37 +32,37 @@ func (Alert) TableName() string {
 
 // AlertConfiguration 配置表模型 - 完全匹配 SLS SDK
 type AlertConfiguration struct {
-	ID                    uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	AlertID               uint      `json:"alert_id" gorm:"not null"`
-	AutoAnnotation        *bool     `json:"auto_annotation" gorm:"type:boolean;default:false"`
-	Dashboard             *string   `json:"dashboard" gorm:"type:varchar(255)"`
-	MuteUntil             *int64    `json:"mute_until" gorm:"type:bigint"`
-	NoDataFire            *bool     `json:"no_data_fire" gorm:"type:boolean;default:false"`
-	NoDataSeverity        *int32    `json:"no_data_severity" gorm:"type:int"`
-	Threshold             *int32    `json:"threshold" gorm:"type:int"`
-	Type                  *string   `json:"type" gorm:"type:varchar(100)"`
-	Version               *string   `json:"version" gorm:"type:varchar(50)"`
-	SendResolved          *bool     `json:"send_resolved" gorm:"type:boolean;default:false"`
-	ConditionConfigID     *uint     `json:"condition_config_id"`
-	GroupConfigID         *uint     `json:"group_config_id"`
-	PolicyConfigID        *uint     `json:"policy_config_id"`
-	TemplateConfigID      *uint     `json:"template_config_id"`
-	SinkAlerthubConfigID  *uint     `json:"sink_alerthub_config_id"`
-	SinkCmsConfigID       *uint     `json:"sink_cms_config_id"`
-	SinkEventStoreConfigID *uint    `json:"sink_event_store_config_id"`
-	CreatedAt             time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt             time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID                     uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertID                uint      `json:"alert_id" gorm:"not null"`
+	AutoAnnotation         *bool     `json:"auto_annotation" gorm:"type:boolean;default:false"`
+	Dashboard              *string   `json:"dashboard" gorm:"type:varchar(255)"`
+	MuteUntil              *int64    `json:"mute_until" gorm:"type:bigint"`
+	NoDataFire             *bool     `json:"no_data_fire" gorm:"type:boolean;default:false"`
+	NoDataSeverity         *int32    `json:"no_data_severity" gorm:"type:int"`
+	Threshold              *int32    `json:"threshold" gorm:"type:int"`
+	Type                   *string   `json:"type" gorm:"type:varchar(100)"`
+	Version                *string   `json:"version" gorm:"type:varchar(50)"`
+	SendResolved           *bool     `json:"send_resolved" gorm:"type:boolean;default:false"`
+	ConditionConfigID      *uint     `json:"condition_config_id"`
+	GroupConfigID          *uint     `json:"group_config_id"`
+	PolicyConfigID         *uint     `json:"policy_config_id"`
+	TemplateConfigID       *uint     `json:"template_config_id"`
+	SinkAlerthubConfigID   *uint     `json:"sink_alerthub_config_id"`
+	SinkCmsConfigID        *uint     `json:"sink_cms_config_id"`
+	SinkEventStoreConfigID *uint     `json:"sink_event_store_config_id"`
+	CreatedAt              time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt              time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 
 	// 关联关系
-	Alert              Alert                      `json:"alert" gorm:"foreignKey:AlertID"`
-	ConditionConfig    *ConditionConfiguration    `json:"condition_config" gorm:"foreignKey:ConditionConfigID"`
-	GroupConfig        *GroupConfiguration        `json:"group_config" gorm:"foreignKey:GroupConfigID"`
-	PolicyConfig       *PolicyConfiguration      `json:"policy_config" gorm:"foreignKey:PolicyConfigID"`
-	TemplateConfig     *TemplateConfiguration    `json:"template_config" gorm:"foreignKey:TemplateConfigID"`
-	SeverityConfigs    []SeverityConfiguration   `json:"severity_configs" gorm:"foreignKey:AlertConfigID"`
-	JoinConfigs        []JoinConfiguration       `json:"join_configs" gorm:"foreignKey:AlertConfigID"`
-	SinkAlerthubConfig *SinkAlerthubConfiguration `json:"sink_alerthub_config" gorm:"foreignKey:SinkAlerthubConfigID"`
-	SinkCmsConfig      *SinkCmsConfiguration     `json:"sink_cms_config" gorm:"foreignKey:SinkCmsConfigID"`
+	Alert                Alert                        `json:"alert" gorm:"foreignKey:AlertID"`
+	ConditionConfig      *ConditionConfiguration      `json:"condition_config" gorm:"foreignKey:ConditionConfigID"`
+	GroupConfig          *GroupConfiguration          `json:"group_config" gorm:"foreignKey:GroupConfigID"`
+	PolicyConfig         *PolicyConfiguration         `json:"policy_config" gorm:"foreignKey:PolicyConfigID"`
+	TemplateConfig       *TemplateConfiguration       `json:"template_config" gorm:"foreignKey:TemplateConfigID"`
+	SeverityConfigs      []SeverityConfiguration      `json:"severity_configs" gorm:"foreignKey:AlertConfigID"`
+	JoinConfigs          []JoinConfiguration          `json:"join_configs" gorm:"foreignKey:AlertConfigID"`
+	SinkAlerthubConfig   *SinkAlerthubConfiguration   `json:"sink_alerthub_config" gorm:"foreignKey:SinkAlerthubConfigID"`
+	SinkCmsConfig        *SinkCmsConfiguration        `json:"sink_cms_config" gorm:"foreignKey:SinkCmsConfigID"`
 	SinkEventStoreConfig *SinkEventStoreConfiguration `json:"sink_event_store_config" gorm:"foreignKey:SinkEventStoreConfigID"`
 }
 
@@ -113,23 +113,23 @@ func (AlertTag) TableName() string {
 
 // AlertQuery 查询表模型 - 完全匹配 SLS SDK
 type AlertQuery struct {
-	ID          uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	AlertID     uint      `json:"alert_id" gorm:"not null"`
-	ChartTitle  *string   `json:"chart_title" gorm:"type:varchar(255)"`
-	DashboardId *string   `json:"dashboard_id" gorm:"type:varchar(255)"`
-	End         *string   `json:"end" gorm:"type:varchar(100)"`
-	PowerSqlMode *string  `json:"power_sql_mode" gorm:"type:varchar(50)"`
-	Project     *string   `json:"project" gorm:"type:varchar(255)"`
-	Query       string    `json:"query" gorm:"type:text;not null"`
-	Region      *string   `json:"region" gorm:"type:varchar(100)"`
-	RoleArn     *string   `json:"role_arn" gorm:"type:varchar(500)"`
-	Start       *string   `json:"start" gorm:"type:varchar(100)"`
-	Store       *string   `json:"store" gorm:"type:varchar(255)"`
-	StoreType   *string   `json:"store_type" gorm:"type:varchar(100)"`
-	TimeSpanType *string  `json:"time_span_type" gorm:"type:varchar(50)"`
-	Ui          *string   `json:"ui" gorm:"type:varchar(255)"`
-	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID           uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertID      uint      `json:"alert_id" gorm:"not null"`
+	ChartTitle   *string   `json:"chart_title" gorm:"type:varchar(255)"`
+	DashboardId  *string   `json:"dashboard_id" gorm:"type:varchar(255)"`
+	End          *string   `json:"end" gorm:"type:varchar(100)"`
+	PowerSqlMode *string   `json:"power_sql_mode" gorm:"type:varchar(50)"`
+	Project      *string   `json:"project" gorm:"type:varchar(255)"`
+	Query        string    `json:"query" gorm:"type:text;not null"`
+	Region       *string   `json:"region" gorm:"type:varchar(100)"`
+	RoleArn      *string   `json:"role_arn" gorm:"type:varchar(500)"`
+	Start        *string   `json:"start" gorm:"type:varchar(100)"`
+	Store        *string   `json:"store" gorm:"type:varchar(255)"`
+	StoreType    *string   `json:"store_type" gorm:"type:varchar(100)"`
+	TimeSpanType *string   `json:"time_span_type" gorm:"type:varchar(50)"`
+	Ui           *string   `json:"ui" gorm:"type:varchar(255)"`
+	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 
 	// 关联关系
 	Alert Alert `json:"alert" gorm:"foreignKey:AlertID"`
@@ -143,10 +143,14 @@ func (AlertQuery) TableName() string {
 // ConditionConfiguration 条件配置表模型 - 完全匹配 SLS SDK
 type ConditionConfiguration struct {
 	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID  uint      `json:"alert_config_id" gorm:"not null"`
 	Condition      *string   `json:"condition" gorm:"type:text"`
 	CountCondition *string   `json:"count_condition" gorm:"type:text"`
 	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt      time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -157,10 +161,14 @@ func (ConditionConfiguration) TableName() string {
 // GroupConfiguration 分组配置表模型 - 完全匹配 SLS SDK
 type GroupConfiguration struct {
 	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID uint      `json:"alert_config_id" gorm:"not null"`
 	Fields        *string   `json:"fields" gorm:"type:text"` // 存储为逗号分隔的字符串
 	Type          *string   `json:"type" gorm:"type:varchar(100)"`
 	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -170,12 +178,16 @@ func (GroupConfiguration) TableName() string {
 
 // PolicyConfiguration 策略配置表模型 - 完全匹配 SLS SDK
 type PolicyConfiguration struct {
-	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	ActionPolicyId  *string   `json:"action_policy_id" gorm:"type:varchar(255)"`
-	AlertPolicyId   *string   `json:"alert_policy_id" gorm:"type:varchar(255)"`
-	RepeatInterval  *string   `json:"repeat_interval" gorm:"type:varchar(100)"`
-	CreatedAt       time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt       time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID  uint      `json:"alert_config_id" gorm:"not null"`
+	ActionPolicyId *string   `json:"action_policy_id" gorm:"type:varchar(255)"`
+	AlertPolicyId  *string   `json:"alert_policy_id" gorm:"type:varchar(255)"`
+	RepeatInterval *string   `json:"repeat_interval" gorm:"type:varchar(100)"`
+	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt      time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -185,15 +197,19 @@ func (PolicyConfiguration) TableName() string {
 
 // TemplateConfiguration 模板配置表模型 - 完全匹配 SLS SDK
 type TemplateConfiguration struct {
-	ID           uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	TemplateId   *string   `json:"template_id" gorm:"type:varchar(255)"`
-	Lang         *string   `json:"lang" gorm:"type:varchar(10)"`
-	Type         *string   `json:"type" gorm:"type:varchar(100)"`
-	Version      *string   `json:"version" gorm:"type:varchar(50)"`
-	Aonotations  *string   `json:"aonotations" gorm:"type:json"` // 存储为 JSON 字符串
-	Tokens       *string   `json:"tokens" gorm:"type:json"`      // 存储为 JSON 字符串
-	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt    time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID uint      `json:"alert_config_id" gorm:"not null"`
+	TemplateId    *string   `json:"template_id" gorm:"type:varchar(255)"`
+	Lang          *string   `json:"lang" gorm:"type:varchar(10)"`
+	Type          *string   `json:"type" gorm:"type:varchar(100)"`
+	Version       *string   `json:"version" gorm:"type:varchar(50)"`
+	Aonotations   *string   `json:"aonotations" gorm:"type:json"` // 存储为 JSON 字符串
+	Tokens        *string   `json:"tokens" gorm:"type:json"`      // 存储为 JSON 字符串
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -203,16 +219,16 @@ func (TemplateConfiguration) TableName() string {
 
 // SeverityConfiguration 严重程度配置表模型 - 完全匹配 SLS SDK
 type SeverityConfiguration struct {
-	ID             uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	AlertConfigID  uint      `json:"alert_config_id" gorm:"not null"`
-	Severity       *int32    `json:"severity" gorm:"type:int"`
-	EvalConditionID *uint    `json:"eval_condition_id"`
-	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt      time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID              uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID   uint      `json:"alert_config_id" gorm:"not null"`
+	Severity        *int32    `json:"severity" gorm:"type:int"`
+	EvalConditionID *uint     `json:"eval_condition_id"`
+	CreatedAt       time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt       time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 
 	// 关联关系
-	AlertConfig    AlertConfiguration     `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
-	EvalCondition  *ConditionConfiguration `json:"eval_condition" gorm:"foreignKey:EvalConditionID"`
+	AlertConfig   AlertConfiguration      `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
+	EvalCondition *ConditionConfiguration `json:"eval_condition" gorm:"foreignKey:EvalConditionID"`
 }
 
 // TableName 指定表名
@@ -240,10 +256,14 @@ func (JoinConfiguration) TableName() string {
 
 // SinkAlerthubConfiguration 告警中心配置表模型 - 新增，匹配 SLS SDK
 type SinkAlerthubConfiguration struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	Enabled   *bool     `json:"enabled" gorm:"type:boolean;default:false"`
-	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID uint      `json:"alert_config_id" gorm:"not null"`
+	Enabled       *bool     `json:"enabled" gorm:"type:boolean;default:false"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -253,10 +273,14 @@ func (SinkAlerthubConfiguration) TableName() string {
 
 // SinkCmsConfiguration 云监控配置表模型 - 新增，匹配 SLS SDK
 type SinkCmsConfiguration struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	Enabled   *bool     `json:"enabled" gorm:"type:boolean;default:false"`
-	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID uint      `json:"alert_config_id" gorm:"not null"`
+	Enabled       *bool     `json:"enabled" gorm:"type:boolean;default:false"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名
@@ -266,14 +290,18 @@ func (SinkCmsConfiguration) TableName() string {
 
 // SinkEventStoreConfiguration 事件存储配置表模型 - 新增，匹配 SLS SDK
 type SinkEventStoreConfiguration struct {
-	ID        uint      `json:"id" gorm:"primaryKey;autoIncrement"`
-	Enabled   *bool     `json:"enabled" gorm:"type:boolean;default:false"`
-	Endpoint  *string   `json:"endpoint" gorm:"type:varchar(500)"`
-	EventStore *string  `json:"event_store" gorm:"type:varchar(255)"`
-	Project   *string   `json:"project" gorm:"type:varchar(255)"`
-	RoleArn   *string   `json:"role_arn" gorm:"type:varchar(500)"`
-	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	AlertConfigID uint      `json:"alert_config_id" gorm:"not null"`
+	Enabled       *bool     `json:"enabled" gorm:"type:boolean;default:false"`
+	Endpoint      *string   `json:"endpoint" gorm:"type:varchar(500)"`
+	EventStore    *string   `json:"event_store" gorm:"type:varchar(255)"`
+	Project       *string   `json:"project" gorm:"type:varchar(255)"`
+	RoleArn       *string   `json:"role_arn" gorm:"type:varchar(500)"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	// 关联关系
+	AlertConfig AlertConfiguration `json:"alert_config" gorm:"foreignKey:AlertConfigID"`
 }
 
 // TableName 指定表名

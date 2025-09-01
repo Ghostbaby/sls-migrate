@@ -136,7 +136,8 @@ func (s *slsService) convertSLSAlertToModel(slsAlert *sls20201230.Alert) *models
 		}
 
 		// 转换 ConditionConfiguration
-		if slsAlert.Configuration.ConditionConfiguration != nil {
+		if slsAlert.Configuration.ConditionConfiguration.Condition != nil ||
+			slsAlert.Configuration.ConditionConfiguration.CountCondition != nil {
 			conditionConfig := &models.ConditionConfiguration{
 				Condition:      slsAlert.Configuration.ConditionConfiguration.Condition,
 				CountCondition: slsAlert.Configuration.ConditionConfiguration.CountCondition,

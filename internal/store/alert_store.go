@@ -206,78 +206,19 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 		// 更新原始alert的ID
 		alert.ID = cleanAlert.ID
 
-		// 步骤2: 创建所有独立的配置表记录
+		// 步骤2: 先创建 alert_configurations 记录
 		if originalConfig != nil {
-			// 创建独立的配置表记录
-			if originalConfig.ConditionConfig != nil {
-				if err := tx.Create(originalConfig.ConditionConfig).Error; err != nil {
-					return fmt.Errorf("failed to create condition configuration: %w", err)
-				}
-				originalConfig.ConditionConfigID = &originalConfig.ConditionConfig.ID
-			}
-
-			if originalConfig.GroupConfig != nil {
-				if err := tx.Create(originalConfig.GroupConfig).Error; err != nil {
-					return fmt.Errorf("failed to create group configuration: %w", err)
-				}
-				originalConfig.GroupConfigID = &originalConfig.GroupConfig.ID
-			}
-
-			if originalConfig.PolicyConfig != nil {
-				if err := tx.Create(originalConfig.PolicyConfig).Error; err != nil {
-					return fmt.Errorf("failed to create policy configuration: %w", err)
-				}
-				originalConfig.PolicyConfigID = &originalConfig.PolicyConfig.ID
-			}
-
-			if originalConfig.TemplateConfig != nil {
-				if err := tx.Create(originalConfig.TemplateConfig).Error; err != nil {
-					return fmt.Errorf("failed to create template configuration: %w", err)
-				}
-				originalConfig.TemplateConfigID = &originalConfig.TemplateConfig.ID
-			}
-
-			// 创建 Sink 配置
-			if originalConfig.SinkAlerthubConfig != nil {
-				if err := tx.Create(originalConfig.SinkAlerthubConfig).Error; err != nil {
-					return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
-				}
-				originalConfig.SinkAlerthubConfigID = &originalConfig.SinkAlerthubConfig.ID
-			}
-
-			if originalConfig.SinkCmsConfig != nil {
-				if err := tx.Create(originalConfig.SinkCmsConfig).Error; err != nil {
-					return fmt.Errorf("failed to create sink cms configuration: %w", err)
-				}
-				originalConfig.SinkCmsConfigID = &originalConfig.SinkCmsConfig.ID
-			}
-
-			if originalConfig.SinkEventStoreConfig != nil {
-				if err := tx.Create(originalConfig.SinkEventStoreConfig).Error; err != nil {
-					return fmt.Errorf("failed to create sink event store configuration: %w", err)
-				}
-				originalConfig.SinkEventStoreConfigID = &originalConfig.SinkEventStoreConfig.ID
-			}
-
-			// 步骤3: 创建 alert_configurations 记录
 			configToCreate := models.AlertConfiguration{
-				AlertID:                alert.ID,
-				AutoAnnotation:         originalConfig.AutoAnnotation,
-				Dashboard:              originalConfig.Dashboard,
-				MuteUntil:              originalConfig.MuteUntil,
-				NoDataFire:             originalConfig.NoDataFire,
-				NoDataSeverity:         originalConfig.NoDataSeverity,
-				Threshold:              originalConfig.Threshold,
-				Type:                   originalConfig.Type,
-				Version:                originalConfig.Version,
-				SendResolved:           originalConfig.SendResolved,
-				ConditionConfigID:      originalConfig.ConditionConfigID,
-				GroupConfigID:          originalConfig.GroupConfigID,
-				PolicyConfigID:         originalConfig.PolicyConfigID,
-				TemplateConfigID:       originalConfig.TemplateConfigID,
-				SinkAlerthubConfigID:   originalConfig.SinkAlerthubConfigID,
-				SinkCmsConfigID:        originalConfig.SinkCmsConfigID,
-				SinkEventStoreConfigID: originalConfig.SinkEventStoreConfigID,
+				AlertID:        alert.ID,
+				AutoAnnotation: originalConfig.AutoAnnotation,
+				Dashboard:      originalConfig.Dashboard,
+				MuteUntil:      originalConfig.MuteUntil,
+				NoDataFire:     originalConfig.NoDataFire,
+				NoDataSeverity: originalConfig.NoDataSeverity,
+				Threshold:      originalConfig.Threshold,
+				Type:           originalConfig.Type,
+				Version:        originalConfig.Version,
+				SendResolved:   originalConfig.SendResolved,
 			}
 
 			if err := tx.Create(&configToCreate).Error; err != nil {
@@ -287,11 +228,64 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 			originalConfig.ID = configToCreate.ID
 			alert.ConfigurationID = &configToCreate.ID
 
+			// 步骤3: 创建所有配置表记录，并设置 alert_config_id
+			if originalConfig.ConditionConfig != nil {
+				originalConfig.ConditionConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.ConditionConfig).Error; err != nil {
+					return fmt.Errorf("failed to create condition configuration: %w", err)
+				}
+			}
+
+			if originalConfig.GroupConfig != nil {
+				originalConfig.GroupConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.GroupConfig).Error; err != nil {
+					return fmt.Errorf("failed to create group configuration: %w", err)
+				}
+			}
+
+			if originalConfig.PolicyConfig != nil {
+				originalConfig.PolicyConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.PolicyConfig).Error; err != nil {
+					return fmt.Errorf("failed to create policy configuration: %w", err)
+				}
+			}
+
+			if originalConfig.TemplateConfig != nil {
+				originalConfig.TemplateConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.TemplateConfig).Error; err != nil {
+					return fmt.Errorf("failed to create template configuration: %w", err)
+				}
+			}
+
+			// 创建 Sink 配置
+			if originalConfig.SinkAlerthubConfig != nil {
+				originalConfig.SinkAlerthubConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.SinkAlerthubConfig).Error; err != nil {
+					return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
+				}
+			}
+
+			if originalConfig.SinkCmsConfig != nil {
+				originalConfig.SinkCmsConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.SinkCmsConfig).Error; err != nil {
+					return fmt.Errorf("failed to create sink cms configuration: %w", err)
+				}
+			}
+
+			if originalConfig.SinkEventStoreConfig != nil {
+				originalConfig.SinkEventStoreConfig.AlertConfigID = configToCreate.ID
+				if err := tx.Create(originalConfig.SinkEventStoreConfig).Error; err != nil {
+					return fmt.Errorf("failed to create sink event store configuration: %w", err)
+				}
+			}
+
 			// 步骤4: 创建依赖于alert_configurations的记录
 			if len(originalConfig.SeverityConfigs) > 0 {
 				for i := range originalConfig.SeverityConfigs {
 					// 如果有 EvalCondition，先创建它
 					if originalConfig.SeverityConfigs[i].EvalCondition != nil {
+						// EvalCondition 需要设置 alert_config_id，它应该引用 SeverityConfig 所属的 alert_config
+						originalConfig.SeverityConfigs[i].EvalCondition.AlertConfigID = configToCreate.ID
 						if err := tx.Create(originalConfig.SeverityConfigs[i].EvalCondition).Error; err != nil {
 							return fmt.Errorf("failed to create eval condition: %w", err)
 						}
