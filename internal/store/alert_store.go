@@ -89,32 +89,82 @@ func (s *alertStore) Update(ctx context.Context, alert *models.Alert) error {
 // Delete 删除 Alert
 func (s *alertStore) Delete(ctx context.Context, id uint) error {
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 步骤1: 删除所有关联的子表数据
-		if err := s.deleteConfigurationAssociations(tx, id); err != nil {
-			return fmt.Errorf("failed to delete configuration associations: %w", err)
+		// 根据新的schema设计，删除操作需要正确的顺序：
+		// 1. 先删除 SeverityConfiguration（因为它引用 ConditionConfiguration）
+		// 2. 然后删除其他配置记录
+		// 3. 最后删除 AlertConfiguration 和 Alert
+
+		// 步骤1: 先获取 Configuration ID
+		var configID uint
+		if err := tx.Model(&models.AlertConfiguration{}).Where("alert_id = ?", id).Select("id").First(&configID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				// 没有 Configuration，直接删除 Alert
+				if err := tx.Delete(&models.Alert{}, id).Error; err != nil {
+					return fmt.Errorf("failed to delete alert: %w", err)
+				}
+				return nil
+			}
+			return fmt.Errorf("failed to get configuration ID: %w", err)
 		}
 
-		// 步骤2: 删除 Configuration 记录
-		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertConfiguration{}).Error; err != nil {
+		// 步骤2: 先删除 SeverityConfiguration（因为它引用 ConditionConfiguration）
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SeverityConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete severity configurations: %w", err)
+		}
+
+		// 步骤3: 删除其他配置记录（按照依赖顺序）
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.JoinConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete join configurations: %w", err)
+		}
+
+		// 步骤4: 删除所有配置表记录（因为它们都引用 alert_config_id）
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.ConditionConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete condition configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.GroupConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete group configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.PolicyConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete policy configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.TemplateConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete template configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SinkAlerthubConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete sink alerthub configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SinkCmsConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete sink cms configurations: %w", err)
+		}
+
+		if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SinkEventStoreConfiguration{}).Error; err != nil {
+			return fmt.Errorf("failed to delete sink event store configurations: %w", err)
+		}
+
+		// 步骤5: 现在可以安全删除 AlertConfiguration
+		if err := tx.Delete(&models.AlertConfiguration{}, configID).Error; err != nil {
 			return fmt.Errorf("failed to delete alert configuration: %w", err)
 		}
 
-		// 步骤3: 删除 Schedule 记录
+		// 步骤6: 删除其他关联表记录
 		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertSchedule{}).Error; err != nil {
 			return fmt.Errorf("failed to delete alert schedule: %w", err)
 		}
 
-		// 步骤4: 删除 Tags 记录
 		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertTag{}).Error; err != nil {
 			return fmt.Errorf("failed to delete alert tags: %w", err)
 		}
 
-		// 步骤5: 删除 Queries 记录
 		if err := tx.Where("alert_id = ?", id).Delete(&models.AlertQuery{}).Error; err != nil {
 			return fmt.Errorf("failed to delete alert queries: %w", err)
 		}
 
-		// 步骤6: 最后删除主记录
+		// 步骤7: 最后删除主记录
 		if err := tx.Delete(&models.Alert{}, id).Error; err != nil {
 			return fmt.Errorf("failed to delete alert: %w", err)
 		}
@@ -390,34 +440,20 @@ func (s *alertStore) CreateWithTransaction(ctx context.Context, alert *models.Al
 	})
 }
 
-// deleteConfigurationAssociations 删除 Configuration 的所有关联数据
-func (s *alertStore) deleteConfigurationAssociations(tx *gorm.DB, alertID uint) error {
-	// 先获取 Configuration ID
-	var configID uint
-	if err := tx.Model(&models.AlertConfiguration{}).Where("alert_id = ?", alertID).Select("id").First(&configID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil // 没有 Configuration，直接返回
-		}
-		return fmt.Errorf("failed to get configuration ID: %w", err)
-	}
-
-	// 删除所有关联的子表数据
-	if err := tx.Where("alert_config_id = ?", configID).Delete(&models.SeverityConfiguration{}).Error; err != nil {
-		return fmt.Errorf("failed to delete severity configurations: %w", err)
-	}
-
-	if err := tx.Where("alert_config_id = ?", configID).Delete(&models.JoinConfiguration{}).Error; err != nil {
-		return fmt.Errorf("failed to delete join configurations: %w", err)
-	}
-
-	// 注意：这里不删除 Configuration 本身，因为主删除方法会处理
-	return nil
-}
+// 注意：deleteConfigurationAssociations 函数已被移除
+// 根据新的schema设计，外键约束会自动处理级联删除，不再需要手动删除关联数据
 
 // recreateConfiguration 重新创建 Configuration 及其关联数据
 func (s *alertStore) recreateConfiguration(tx *gorm.DB, alert *models.Alert) error {
 	if alert.Configuration == nil {
 		return nil
+	}
+
+	// 先删除旧的 Configuration 记录（会自动级联删除所有配置表记录）
+	if alert.ConfigurationID != nil {
+		if err := tx.Delete(&models.AlertConfiguration{}, *alert.ConfigurationID).Error; err != nil {
+			return fmt.Errorf("failed to delete old alert configuration: %w", err)
+		}
 	}
 
 	// 创建新的 Configuration
@@ -434,69 +470,71 @@ func (s *alertStore) recreateConfiguration(tx *gorm.DB, alert *models.Alert) err
 		SendResolved:   alert.Configuration.SendResolved,
 	}
 
-	// 创建独立的配置表记录
-	if alert.Configuration.ConditionConfig != nil {
-		if err := tx.Create(alert.Configuration.ConditionConfig).Error; err != nil {
-			return fmt.Errorf("failed to create condition configuration: %w", err)
-		}
-		configToCreate.ConditionConfigID = &alert.Configuration.ConditionConfig.ID
-	}
-
-	if alert.Configuration.GroupConfig != nil {
-		if err := tx.Create(alert.Configuration.GroupConfig).Error; err != nil {
-			return fmt.Errorf("failed to create group configuration: %w", err)
-		}
-		configToCreate.GroupConfigID = &alert.Configuration.GroupConfig.ID
-	}
-
-	if alert.Configuration.PolicyConfig != nil {
-		if err := tx.Create(alert.Configuration.PolicyConfig).Error; err != nil {
-			return fmt.Errorf("failed to create policy configuration: %w", err)
-		}
-		configToCreate.PolicyConfigID = &alert.Configuration.PolicyConfig.ID
-	}
-
-	if alert.Configuration.TemplateConfig != nil {
-		if err := tx.Create(alert.Configuration.TemplateConfig).Error; err != nil {
-			return fmt.Errorf("failed to create template configuration: %w", err)
-		}
-		configToCreate.TemplateConfigID = &alert.Configuration.TemplateConfig.ID
-	}
-
-	// 创建 Sink 配置
-	if alert.Configuration.SinkAlerthubConfig != nil {
-		if err := tx.Create(alert.Configuration.SinkAlerthubConfig).Error; err != nil {
-			return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
-		}
-		configToCreate.SinkAlerthubConfigID = &alert.Configuration.SinkAlerthubConfig.ID
-	}
-
-	if alert.Configuration.SinkCmsConfig != nil {
-		if err := tx.Create(alert.Configuration.SinkCmsConfig).Error; err != nil {
-			return fmt.Errorf("failed to create sink cms configuration: %w", err)
-		}
-		configToCreate.SinkCmsConfigID = &alert.Configuration.SinkCmsConfig.ID
-	}
-
-	if alert.Configuration.SinkEventStoreConfig != nil {
-		if err := tx.Create(alert.Configuration.SinkEventStoreConfig).Error; err != nil {
-			return fmt.Errorf("failed to create sink event store configuration: %w", err)
-		}
-		configToCreate.SinkEventStoreConfigID = &alert.Configuration.SinkEventStoreConfig.ID
-	}
-
-	// 创建 Configuration 记录
 	if err := tx.Create(&configToCreate).Error; err != nil {
 		return fmt.Errorf("failed to create alert configuration: %w", err)
 	}
 
 	alert.ConfigurationID = &configToCreate.ID
 
+	// 根据新的schema设计，现在所有配置记录都需要设置 alert_config_id
+	// 创建所有配置表记录，并设置 alert_config_id
+	if alert.Configuration.ConditionConfig != nil {
+		alert.Configuration.ConditionConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.ConditionConfig).Error; err != nil {
+			return fmt.Errorf("failed to create condition configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.GroupConfig != nil {
+		alert.Configuration.GroupConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.GroupConfig).Error; err != nil {
+			return fmt.Errorf("failed to create group configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.PolicyConfig != nil {
+		alert.Configuration.PolicyConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.PolicyConfig).Error; err != nil {
+			return fmt.Errorf("failed to create policy configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.TemplateConfig != nil {
+		alert.Configuration.TemplateConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.TemplateConfig).Error; err != nil {
+			return fmt.Errorf("failed to create template configuration: %w", err)
+		}
+	}
+
+	// 创建 Sink 配置
+	if alert.Configuration.SinkAlerthubConfig != nil {
+		alert.Configuration.SinkAlerthubConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.SinkAlerthubConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink alerthub configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.SinkCmsConfig != nil {
+		alert.Configuration.SinkCmsConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.SinkCmsConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink cms configuration: %w", err)
+		}
+	}
+
+	if alert.Configuration.SinkEventStoreConfig != nil {
+		alert.Configuration.SinkEventStoreConfig.AlertConfigID = configToCreate.ID
+		if err := tx.Create(alert.Configuration.SinkEventStoreConfig).Error; err != nil {
+			return fmt.Errorf("failed to create sink event store configuration: %w", err)
+		}
+	}
+
 	// 创建依赖于 alert_configurations 的记录
 	if len(alert.Configuration.SeverityConfigs) > 0 {
 		for i := range alert.Configuration.SeverityConfigs {
 			// 如果有 EvalCondition，先创建它
 			if alert.Configuration.SeverityConfigs[i].EvalCondition != nil {
+				// EvalCondition 需要设置 alert_config_id
+				alert.Configuration.SeverityConfigs[i].EvalCondition.AlertConfigID = configToCreate.ID
 				if err := tx.Create(alert.Configuration.SeverityConfigs[i].EvalCondition).Error; err != nil {
 					return fmt.Errorf("failed to create eval condition: %w", err)
 				}
@@ -546,14 +584,11 @@ func (s *alertStore) UpdateWithTransaction(ctx context.Context, alert *models.Al
 
 		// 步骤2: 处理 Configuration 更新
 		if alert.Configuration != nil {
-			// 先删除旧的关联数据（但不删除主配置记录）
-			if err := s.deleteConfigurationAssociations(tx, alert.ID); err != nil {
-				return fmt.Errorf("failed to delete old configuration associations: %w", err)
-			}
-
-			// 更新现有的 Configuration 记录
-			if err := s.updateConfiguration(tx, alert); err != nil {
-				return fmt.Errorf("failed to update configuration: %w", err)
+			// 根据新的schema设计，更新操作更简单：
+			// 1. 删除旧的 AlertConfiguration 会自动级联删除所有配置表记录
+			// 2. 重新创建新的配置记录
+			if err := s.recreateConfiguration(tx, alert); err != nil {
+				return fmt.Errorf("failed to recreate configuration: %w", err)
 			}
 		}
 
